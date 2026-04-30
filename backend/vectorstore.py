@@ -1,27 +1,30 @@
-# simple persistent store mit verbesserter Suche
+from sentence_transformers import SentenceTransformer
+import numpy as np
+
+model = SentenceTransformer("all-MiniLM-L6-v2")
 
 store = []
 
 
 def add_doc(text, meta):
+    emb = model.encode(text)
+
     store.append({
         "text": text,
-        "meta": meta
+        "meta": meta,
+        "embedding": emb
     })
 
 
-def search(query):
-    results = []
-    query_words = query.lower().split()
+def search(query, top_k=5):
+    q_emb = model.encode(query)
+
+    scores = []
 
     for item in store:
-        text_lower = item["text"].lower()
-        # Match wenn IRGENDEIN Wort aus der Query im Text vorkommt
-        if any(word in text_lower for word in query_words):
-            results.append(item)
+        score = np.dot(q_emb, item["embedding"])
+        scores.append((score, item))
 
-    return results
+    scores.sort(reverse=True, key=lambda x: x[0])
 
-
-def get_store_size():
-    return len(store)
+    return [x[1] for x in scores[:top_k]]

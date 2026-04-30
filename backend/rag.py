@@ -1,18 +1,16 @@
 from vectorstore import search
 
 
-def build_context(query, groups):
+def build_context(query, groups=None):
 
     results = search(query)
 
-    print(f"RAG: query='{query}' → {len(results)} Treffer gefunden")
-
     if not results:
-        return "Kein Kontext gefunden."
+        return ""
 
     context = ""
 
-    for r in results[:5]:
+    for r in results:
         context += f"\nSOURCE: {r['meta']}\nTEXT: {r['text']}\n"
 
     return context

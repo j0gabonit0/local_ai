@@ -1,13 +1,11 @@
 import requests
-import os
 
-URL = os.getenv("OLLAMA_URL")
+OLLAMA_URL = "http://ollama:11434"
 
 
 def ask_llm(prompt):
-
     r = requests.post(
-        f"{URL}/api/generate",
+        f"{OLLAMA_URL}/api/generate",
         json={
             "model": "llama3",
             "prompt": prompt,
@@ -15,4 +13,4 @@ def ask_llm(prompt):
         }
     )
 
-    return r.json()["response"]
+    return r.json().get("response", "")

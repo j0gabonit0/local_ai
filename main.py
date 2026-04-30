@@ -1,9 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-import requests
 
-from indexer import index_nextcloud
 from rag import build_context
+from llm import ask_llm
 
 app = FastAPI()
 
@@ -14,80 +13,84 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-OLLAMA_URL = "http://ollama:11434"
 
-
-# ---------------------------
-# HEALTH CHECK
-# ---------------------------
+# -------------------------
+# ROOT
+# -------------------------
 @app.get("/")
 def root():
-    return {"status": "Nextcloud AI läuft"}
+    return {"status": "ok"}
 
 
-# ---------------------------
-# INDEX NEXTCLOUD
-# ---------------------------
+# -------------------------
+# INDEX TEST
+# -------------------------
 @app.get("/index")
 def index():
-
-    result = index_nextcloud()
-
-    return {
-        "status": "ok",
-        "files_found": result.get("files", 0),
-        "documents_indexed": result.get("count", 0)
-    }
+    return {"status": "ok"}
 
 
-# ---------------------------
-# CHAT ENDPOINT (RAG)
-# ---------------------------
-@app.post("/chat")
-def chat(req: dict):
+# -------------------------
+# OPENAI COMPATIBLE CHAT ENDPOINT
+# -------------------------
+@app.post("/v1/chat/completions")
+async def chat(req: Request):
 
-    query = req.get("query")
-    user = req.get("user", "unknown")
+    body = await req.json()
+    messages = body.get("messages", [])
+
+    # letzte User Message extrahieren
+    query = ""
+    for m in reversed(messages):
+        if m.get("role") == "user":
+            query = m.get("content")
+            break
 
     if not query:
-        return {"error": "query fehlt"}
+        return {
+            "error": "no user message found"
+        }
 
-    # später aus Nextcloud Gruppen / ACL
-    groups = ["HR", "Finance"]
+    # RAG CONTEXT BUILD
+    context = build_context(query)
 
-    # RAG Kontext holen
-    context = build_context(query, groups)
+    # DEBUG OUTPUT
+    print("\n===== CONTEXT DEBUG =====")
+    print("QUERY:", query)
+    print("CONTEXT:\n", context)
+    print("========================\n")
 
+    # Prompt bauen
     prompt = f"""
-Du bist ein interner Firmenassistent.
+Du bist ein Firmenassistent.
 
-Nutze ausschließlich den folgenden Kontext:
+Nutze nur diesen Kontext:
 
 {context}
 
 Frage: {query}
 """
 
+    # LLM CALL
     try:
-        r = requests.post(
-            f"{OLLAMA_URL}/api/generate",
-            json={
-                "model": "llama3:latest",
-                "prompt": prompt,
-                "stream": False
-            },
-            timeout=120
-        )
-
-        data = r.json()
-
-        return {
-            "answer": data.get("response", ""),
-            "user": user
-        }
-
+        answer = ask_llm(prompt)
     except Exception as e:
         return {
-            "error": "LLM Fehler",
+            "error": "llm_error",
             "details": str(e)
         }
+
+    # OpenAI kompatible Response
+    return {
+        "id": "chatcmpl-local",
+        "object": "chat.completion",
+        "choices": [
+            {
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": answer
+                }
+            }
+        ]
+    }
