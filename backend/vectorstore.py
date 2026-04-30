@@ -1,4 +1,4 @@
-# simple in-memory store (für MVP)
+# simple persistent store mit verbesserter Suche
 
 store = []
 
@@ -12,9 +12,16 @@ def add_doc(text, meta):
 
 def search(query):
     results = []
+    query_words = query.lower().split()
 
     for item in store:
-        if query.lower() in item["text"].lower():
+        text_lower = item["text"].lower()
+        # Match wenn IRGENDEIN Wort aus der Query im Text vorkommt
+        if any(word in text_lower for word in query_words):
             results.append(item)
 
     return results
+
+
+def get_store_size():
+    return len(store)

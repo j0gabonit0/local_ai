@@ -7,6 +7,24 @@ from rag import build_context
 
 app = FastAPI()
 
+
+
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Beim Start automatisch indexieren
+    print("AUTO-INDEXING beim Start...")
+    try:
+        index_nextcloud()
+        print("Index fertig.")
+    except Exception as e:
+        print("Index Fehler:", e)
+    yield
+
+app = FastAPI(lifespan=lifespan)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

@@ -5,6 +5,8 @@ def build_context(query, groups):
 
     results = search(query)
 
+    print(f"RAG: query='{query}' → {len(results)} Treffer gefunden")
+
     if not results:
         return "Kein Kontext gefunden."
 
