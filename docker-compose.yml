@@ -1,0 +1,38 @@
+services:
+
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: nextcloud-ai-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      - NEXTCLOUD_URL=https://10.0.5.25
+      - NEXTCLOUD_USER=ai_user
+      - NEXTCLOUD_PASSWORD=y7mdgwxz
+      - OLLAMA_URL=http://ollama:11434
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+  frontend:
+    image: nginx:alpine
+    container_name: nextcloud-ai-frontend
+    ports:
+      - "3000:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+    restart: unless-stopped
+
+volumes:
+  ollama:

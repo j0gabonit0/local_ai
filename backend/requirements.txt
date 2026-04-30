@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+requests
+llama-index
+chromadb
+numpy
+sentence-transformers
+numpy
+pymupdf

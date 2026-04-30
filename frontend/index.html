@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Nextcloud AI Chat</title>
+</head>
+
+<body style="font-family: sans-serif; padding: 20px;">
+
+<h2>Nextcloud AI Chat</h2>
+
+<input id="q" style="width:300px" placeholder="Frage eingeben...">
+<button onclick="ask()">Senden</button>
+
+<h3>Antwort:</h3>
+<pre id="out" style="background:#eee; padding:10px;"></pre>
+
+<script>
+async function ask() {
+    const q = document.getElementById("q").value;
+
+    document.getElementById("out").innerText = "Lade...";
+
+    try {
+        const res = await fetch("http://localhost:8000/chat", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                query: q,
+                user: "sascha"
+            })
+        });
+
+        const data = await res.json();
+
+        console.log("API RESPONSE:", data);
+
+        document.getElementById("out").innerText =
+            data.answer || data.error || "Keine Antwort erhalten";
+
+    } catch (err) {
+        console.error(err);
+        document.getElementById("out").innerText =
+            "FEHLER: " + err.message;
+    }
+}
+</script>
+
+</body>
+</html>
