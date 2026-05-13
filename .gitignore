@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Chroma
+chroma_db/
+
+# Ollama
+ollama_data/
+
+# OpenWebUI
+openwebui_data/
+
+# Nextcloud
+nextcloud/
+
+# Docker
+*.log
+*.sqlite
+*.db
+
+# Environment
+.env
+
+# VSCode
+.vscode/
+
+# Linux
+*.swp
+
+
+backend/chroma/
+*.sqlite3

@@ -1,30 +1,33 @@
-from sentence_transformers import SentenceTransformer
-import numpy as np
+import chromadb
+from embeddings import embed
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
-
-store = []
+client = chromadb.PersistentClient(path="/chroma_db")
+collection = client.get_or_create_collection("nextcloud_docs")
 
 
 def add_doc(text, meta):
-    emb = model.encode(text)
+    vector = embed(text)
 
-    store.append({
-        "text": text,
-        "meta": meta,
-        "embedding": emb
-    })
+    collection.add(
+        embeddings=[vector],
+        documents=[text],
+        metadatas=[meta],
+        ids=[meta["id"]]
+    )
 
 
-def search(query, top_k=5):
-    q_emb = model.encode(query)
+def search(query, k=5):
+    vector = embed(query)
 
-    scores = []
+    res = collection.query(
+        query_embeddings=[vector],
+        n_results=k
+    )
 
-    for item in store:
-        score = np.dot(q_emb, item["embedding"])
-        scores.append((score, item))
-
-    scores.sort(reverse=True, key=lambda x: x[0])
-
-    return [x[1] for x in scores[:top_k]]
+    return [
+        {
+            "text": res["documents"][0][i],
+            "meta": res["metadatas"][0][i]
+        }
+        for i in range(len(res["documents"][0]))
+    ]

@@ -1,16 +1,11 @@
-from vectorstore import search
+from chroma_store import search
 
+def build_context(query, collection=None, k=5):
+    results = search(query, k=k)
 
-def build_context(query, groups=None):
+    docs = results.get("documents", [[]])[0]
 
-    results = search(query)
-
-    if not results:
+    if not docs:
         return ""
 
-    context = ""
-
-    for r in results:
-        context += f"\nSOURCE: {r['meta']}\nTEXT: {r['text']}\n"
-
-    return context
+    return "\n\n".join(docs)

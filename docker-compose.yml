@@ -1,48 +1,177 @@
-version: "3.9"
-
 services:
+
+  nextcloud-db:
+    image: mariadb:11
+    container_name: local_ai_nextcloud_db
+
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: nextcloud
+      MYSQL_USER: nextcloud
+      MYSQL_PASSWORD: nextcloudpass
+
+    volumes:
+      - ./nextcloud/db:/var/lib/mysql
+
+    restart: unless-stopped
+
+    networks:
+      - ai_net
+
+
+  nextcloud-redis:
+    image: redis:latest
+    container_name: local_ai_nextcloud_redis
+
+    restart: unless-stopped
+
+    networks:
+      - ai_net
+
+
+  nextcloud:
+    image: nextcloud:latest
+    container_name: local_ai_nextcloud
+
+    ports:
+      - "8090:80"
+
+    environment:
+      MYSQL_DATABASE: nextcloud
+      MYSQL_USER: nextcloud
+      MYSQL_PASSWORD: nextcloudpass
+      MYSQL_HOST: nextcloud-db
+      REDIS_HOST: nextcloud-redis
+
+    depends_on:
+      - nextcloud-db
+      - nextcloud-redis
+
+    volumes:
+      - ./nextcloud/data:/var/www/html
+
+    restart: unless-stopped
+
+    networks:
+      - ai_net
+
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: local_ai_ollama
+
+    ports:
+      - "11434:11434"
+
+    volumes:
+      - ollama_data:/root/.ollama
+
+    restart: unless-stopped
+
+    networks:
+      - ai_net
+
+    entrypoint: >
+      sh -c "
+      ollama serve &
+      sleep 10 &&
+      ollama pull llama3 || true &&
+      ollama pull nomic-embed-text || true &&
+      wait
+      "
+
 
   backend:
     build: ./backend
-    container_name: local_ai-backend
+    container_name: local_ai_backend
+
     ports:
       - "8000:8000"
+
     volumes:
-      - ./backend:/app   # 🔥 WICHTIG: Live Code Sync
+      - ./backend:/app
+      - ./chroma_db:/chroma_db
+
+    env_file: .env
+
     environment:
-      - OLLAMA_URL=http://ollama:11434
+      OLLAMA_URL: http://ollama:11434
+      CHROMA_PATH: /chroma_db
+
     depends_on:
       - ollama
+
     restart: unless-stopped
 
-  ollama:
-    image: ollama/ollama
-    container_name: local_ai-ollama
-    ports:
-      - "11434:11434"
+    networks:
+      - ai_net
+
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+
+
+  indexer:
+    build: ./backend
+    container_name: local_ai_indexer
+
     volumes:
-      - ollama_data:/root/.ollama
+      - ./backend:/app
+      - ./chroma_db:/chroma_db
+
+    env_file: .env
+
+    environment:
+      CHROMA_PATH: /chroma_db
+
+    depends_on:
+      - backend
+
     restart: unless-stopped
+
+    networks:
+      - ai_net
+
+    command: >
+      sh -c "
+      while true; do
+        python indexer.py;
+        echo 'Indexed Nextcloud... sleeping 300s';
+        sleep 300;
+      done
+      "
+
 
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
-    container_name: local_ai-open-webui
+    container_name: local_ai_openwebui
+
     ports:
       - "8081:8080"
+
+    volumes:
+      - openwebui_data:/app/backend/data
+
     environment:
-      - OLLAMA_BASE_URL=http://ollama:11434
+      - OPENAI_API_BASE_URL=http://backend:8000/v1
+      - OPENAI_API_KEY=sk-local
+      - ENABLE_OLLAMA_API=false
+
     depends_on:
+      - backend
       - ollama
+
     restart: unless-stopped
 
-  frontend:
-    image: nginx:alpine
-    container_name: local_ai-frontend
-    ports:
-      - "3000:80"
-    volumes:
-      - ./frontend:/usr/share/nginx/html:ro
-    restart: unless-stopped
+    networks:
+      - ai_net
+
+
+networks:
+  ai_net:
+    driver: bridge
+
 
 volumes:
   ollama_data:
+  openwebui_data:
