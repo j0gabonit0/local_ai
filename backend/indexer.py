@@ -95,65 +95,112 @@ def download_file(file_path):
 
 def extract_text(file_path, content):
 
-    if file_path.endswith(".txt"):
+    try:
 
-        return content.decode("utf-8")
+        if file_path.endswith(".txt"):
 
-    if file_path.endswith(".md"):
-
-        return content.decode("utf-8")
-
-    if file_path.endswith(".pdf"):
-
-        with tempfile.NamedTemporaryFile(
-            suffix=".pdf"
-        ) as tmp:
-
-            tmp.write(content)
-            tmp.flush()
-
-            reader = PdfReader(tmp.name)
-
-            text = ""
-
-            for page in reader.pages:
-
-                extracted = page.extract_text()
-
-                if extracted:
-                    text += extracted
-
-            return text
-
-    if file_path.endswith(".docx"):
-
-        with tempfile.NamedTemporaryFile(
-            suffix=".docx"
-        ) as tmp:
-
-            tmp.write(content)
-            tmp.flush()
-
-            doc = Document(tmp.name)
-
-            return "\n".join(
-                [p.text for p in doc.paragraphs]
+            return content.decode(
+                "utf-8",
+                errors="ignore"
             )
+
+        if file_path.endswith(".md"):
+
+            return content.decode(
+                "utf-8",
+                errors="ignore"
+            )
+
+        if file_path.endswith(".pdf"):
+
+            with tempfile.NamedTemporaryFile(
+                suffix=".pdf"
+            ) as tmp:
+
+                tmp.write(content)
+                tmp.flush()
+
+                reader = PdfReader(tmp.name)
+
+                text = ""
+
+                for page in reader.pages:
+
+                    extracted = page.extract_text()
+
+                    if extracted:
+                        text += extracted + "\n"
+
+                return text
+
+        if file_path.endswith(".docx"):
+
+            with tempfile.NamedTemporaryFile(
+                suffix=".docx"
+            ) as tmp:
+
+                tmp.write(content)
+                tmp.flush()
+
+                doc = Document(tmp.name)
+
+                return "\n".join(
+                    [p.text for p in doc.paragraphs]
+                )
+
+    except Exception as e:
+
+        print(
+            f"Extraction error for {file_path}: {e}"
+        )
 
     return ""
 
 
-def split_text(text, chunk_size=500):
+def split_text(text, chunk_size=1200):
+
+    text = text.strip()
+
+    if not text:
+        return []
 
     chunks = []
 
     for i in range(0, len(text), chunk_size):
 
-        chunks.append(
-            text[i:i + chunk_size]
-        )
+        chunk = text[i:i + chunk_size]
+
+        if chunk.strip():
+            chunks.append(chunk)
 
     return chunks
+
+
+def clear_existing_entries(file_path):
+
+    try:
+
+        existing = collection.get(
+            where={
+                "path": file_path
+            }
+        )
+
+        if existing["ids"]:
+
+            collection.delete(
+                ids=existing["ids"]
+            )
+
+            print(
+                f"Removed old entries for {file_path}"
+            )
+
+    except Exception as e:
+
+        print(
+            f"Cleanup failed for {file_path}: {e}"
+        )
 
 
 def index_documents():
@@ -167,6 +214,8 @@ def index_documents():
         try:
 
             print(f"Indexing {file_path}")
+
+            clear_existing_entries(file_path)
 
             binary_content = download_file(
                 file_path
@@ -187,6 +236,18 @@ def index_documents():
 
             chunks = split_text(text)
 
+            if not chunks:
+
+                print(
+                    f"No chunks created: {file_path}"
+                )
+
+                continue
+
+            filename = os.path.basename(
+                file_path
+            )
+
             for idx, chunk in enumerate(chunks):
 
                 embedding = embedding_model.encode(
@@ -197,16 +258,25 @@ def index_documents():
                     ids=[
                         f"{file_path}_{idx}"
                     ],
-                    documents=[chunk],
-                    embeddings=[embedding],
+                    documents=[
+                        chunk
+                    ],
+                    embeddings=[
+                        embedding
+                    ],
                     metadatas=[{
                         "owner": NEXTCLOUD_USER,
                         "path": file_path,
+                        "filename": filename,
+                        "chunk": idx,
                         "source": "nextcloud"
                     }]
                 )
 
-            print(f"Indexed {file_path}")
+            print(
+                f"Indexed {file_path} "
+                f"({len(chunks)} chunks)"
+            )
 
         except Exception as e:
 
