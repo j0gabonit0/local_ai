@@ -137,7 +137,7 @@ services:
       while true; do
         python indexer.py;
         echo 'Indexed Nextcloud... sleeping 300s';
-        sleep 300;
+        sleep 60;
       done
       "
 

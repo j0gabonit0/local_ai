@@ -32,3 +32,4 @@ sentence-transformers
 torch
 pypdf
 python-docx
+openpyxl

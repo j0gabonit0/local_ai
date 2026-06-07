@@ -1,3 +1,4 @@
+local_ai$ cat backend/embeddings.py 
 import requests
 import os
 
@@ -12,3 +13,4 @@ def embed(text: str):
         }
     )
     return r.json()["embedding"]
+sascha@sascha-tux:~/local_ai$ 
